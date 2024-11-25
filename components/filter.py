@@ -5,6 +5,23 @@ import numpy as np
 from scipy.signal import butter
 from numba import jit
 
+@jit(nopython=True)
+def _filter_step(x, b, a, zi):
+    y = b[0] * x + zi[0]
+    for i in range(1, len(b)):
+        zi[i - 1] = b[i] * x + zi[i] - a[i] * y
+    return y, zi
+        
+@jit(nopython=True)
+def _apply_filter(signal: np.ndarray, b, a, zi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    filtered_signal = np.zeros_like(signal)
+    zi = zi.copy()
+    
+    for i in range(len(signal)):
+        filtered_signal[i], zi = _filter_step(signal[i], b, a, zi)
+        
+    return filtered_signal, zi
+
 class Filter:
     """Filter class, for design and apply filter to signal"""
     def __init__(self, filter_type='lowpass', cutoff=1000.0, order=4, sample_rate=44100, bandwidth=None):
@@ -82,25 +99,10 @@ class Filter:
         return:
         - np.ndarray: filtered signal
         """
-        
-    @staticmethod
-    @jit(nopython=True)
-    def _apply_filter(signal: np.ndarray, b, a, zi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        filtered_signal = np.zeros_like(signal)
-        zi = zi.copy()
-        
-        for i in range(len(signal)):
-            filtered_signal[i], zi = Filter._filter_step(signal[i], b, a, zi)
-            
-        return filtered_signal, zi
-        
-    @staticmethod
-    @jit(nopython=True)
-    def _filter_step(x, b, a, zi):
-        y = b[0] * x + zi[0]
-        for i in range(1, len(b)):
-            zi[i - 1] = b[i] * x + zi[i] - a[i] * y
-        return y, zi
+        filtered_signal, self.zi = _apply_filter(signal, self.b, self.a, self.zi)
+        return filtered_signal
+    
+ 
         
         
         
