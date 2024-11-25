@@ -13,7 +13,9 @@ def test_envgen():
         attack=0.2,
         decay=0.5,
         sustain_level=0.5,
-        release=0.3
+        release=0.3,
+        hold=0.2,
+        curve='exp'
     )
     
     t = np.linspace(0, duration, int(sample_rate * duration))[:-1]
