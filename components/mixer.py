@@ -1,6 +1,17 @@
 import numpy as np
 from numba import jit
 
+@jit(nopython=True)
+def _mix_signals(signals: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    num_samples = signals.shape[1]
+    mixed_signal = np.zeros(num_samples, dtype=np.float64)
+    
+    for i in range(signals.shape[0]):
+        for j in range(num_samples):
+            mixed_signal[j] += weights[i] * signals[i, j]
+    
+    return mixed_signal
+
 class Mixer:
     """
     Mixer class, for mixing outputs from various oscillators
@@ -46,22 +57,9 @@ class Mixer:
         
         if len(self.oscillators) == 0:
             raise ValueError("No oscillator added")
-        return self._mix_signals(duration, sample_rate, self.oscillators, self.weights)
         
-    @staticmethod
-    @jit(nopython=True)
-    def _mix_signals(duration: float, sample_rate: int, oscillators, weights: float) -> np.ndarray:
-        num_samples = int(sample_rate * duration)
-        t = np.linspace(0, duration, num_samples)[:-1]
+        signals = np.array([osc.generate(duration, sample_rate) for osc in self.oscillators])
+        weights = np.array(self.weights, dtype=np.float64)
         
-        mixed_signal = np.zeros_like(t, dtype=np.float64)
-        
-        for i, osc in enumerate(oscillators):
-            signal = osc.generate(duration, sample_rate)
-            weight = weight[i]
-            
-            for j in range(num_samples):
-                mixed_signal[j] += weight * signal[j]
-                
-        return mixed_signal
+        return _mix_signals(signals, weights)
         
