@@ -70,7 +70,7 @@ class EnvelopeGenerator:
         - np.ndarray: envelope signal
         """
         num_samples = int(duration * self.sample_rate)
-        envelope = np.zeors(num_samples)
+        envelope = np.zeros(num_samples)
         
         if trigger_on:
             if self.attack_samples > 0:
@@ -92,4 +92,4 @@ class EnvelopeGenerator:
                 release_start = min(num_samples, self.release_samples)
                 envelope[:release_start] = release_signal
                 
-        return envelope
+        return envelope[:-1]
