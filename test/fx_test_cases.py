@@ -24,7 +24,7 @@ def test_fx():
     plt.figure(figsize=(12, 8))
 
     plt.subplot(2, 1, 1)
-    plt.plot(t[:1000], signal[:1000], label="Original Signal")
+    plt.plot(t, signal, label="Original Signal")
     plt.title("Original Signal")
     plt.xlabel("Time [s]")
     plt.ylabel("Amplitude")
@@ -32,7 +32,7 @@ def test_fx():
     plt.legend()
 
     plt.subplot(2, 1, 2)
-    plt.plot(t[:1000], processed_signal[:1000], label="Processed Signal", color='orange')
+    plt.plot(t, processed_signal, label="Processed Signal", color='orange')
     plt.title("Processed Signal with FX")
     plt.xlabel("Time [s]")
     plt.ylabel("Amplitude")
