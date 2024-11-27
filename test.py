@@ -4,9 +4,12 @@ from test.mixer_test_cases import test_mixer
 from test.envgen_test_cases import test_envgen
 from test.fx_test_cases import test_fx
 
+from test.epiano_test_cases import test_epiano
+
 if __name__ == '__main__':
     #test_mod('FM')
     #test_filter()
     #test_mixer()
     #test_envgen()
-    test_fx()
+    #test_fx()
+    test_epiano()

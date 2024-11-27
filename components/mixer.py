@@ -64,4 +64,12 @@ class Mixer:
         weights = np.array(self.weights, dtype=np.float64)
         
         return _mix_signals(signals, weights)
+    
+    
+class OscillatorSignal:
+    def __init__(self, signal):
+        self.signal = signal
+        
+    def generate(self, duration, sample_rate):
+        return self.signal
         
