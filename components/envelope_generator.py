@@ -4,134 +4,81 @@ import numpy as np
 from numba import jit
 
 class EnvelopeGenerator:
-    """Envelope generator class, implement ADSR envelope generator"""
-    
-    def __init__(self, attack=0.01, decay=0.1, sustain_level=0.7, release=0.2, sample_rate=44100):
+    """Generate ADSR envelope"""
+    def __init__(self, attack=0.01, decay=0.1, sustain_level=0.7, release=0.2, sample_rate=44100, curve='lin'):
         """
-        Initialize envelope generator
+        Initialize EnvelopeGenerator
         
         params:
-        - attack (float): attack time (s)
-        - decay (float): decay time (s)
-        - sustain_level (float): sustain level, range [0, 1]
-        - release (float): release time (s)
+        - attack (float): attack time
+        - decay (float): decay time
+        - sustain_level: sustain level, range[0, 1]
+        - release (float): release time
         - sample_rate (int): sample rate
+        - curve (str): curve type, ['lin', 'exp', 'log']
         """
         
-        self.attack_time = attack
-        self.decay_time = decay
-        self.sustain_level = sustain_level
-        self.release_time = release
         self.sample_rate = sample_rate
+        self.attack = attack
+        self.decay = decay
+        self.sustain_level = sustain_level
+        self.release = release
+        self.curve = curve.lower()
         
-        self.attack_samples = max(1, int(self.attack_time * self.sample_rate))
-        self.decay_samples = max(1, int(self.decay_time * self.sample_rate))
-        self.release_samples = max(1, int(self.release_time * self.sample_rate))
+        self.attack_samples = int(self.attack * sample_rate)
+        self.decay_samples = int(self.decay * sample_rate)
+        self.release_samples = int(self.release * sample_rate)
         
-        self.state = 'idle'
-        self.position = 0
-        self.triggered = False
-        self.current_level = 0.0
-        
-    def trigger_on(self):
-        """Start generating envelope"""
-        self.state = 'attack'
-        self.position = 0
-        self.triggered = True
-        
-    def trigger_off(self):
-        """Start release"""
-        self.state = 'release'
-        self.position = 0
-        self.triggered = False
-        self.release_samples = max(1, int(self.release_time * self.sample_rate))
-        self.release_start_level = self.current_level
-        
+    def set_paramters(self, attack=None, decay=None, sustain_level=None, release=None, curve='None'):
+        if attack is not None:
+            self.attack = attack
+            self.attack_samples = int(self.attack * self.sample_rate)
+        if decay is not None:
+            self.decay = decay
+            self.decay_samples = int(self.decay * self.sample_rate)
+        if sustain_level is not None:
+            self.sustain_level = sustain_level
+        if release is not None:
+            self.release = release
+            self.release_samples = int(self.release * self.sample_rate)
+        if curve is not None:
+            self.curve = curve.lower()
+            
     @staticmethod
     @jit(nopython=True)
-    def _generate_envelope(num_samples: int, envelope: np.ndarray, state: str, position: int, current_level: float,
-                           triggered: bool, attack_samples: int, decay_samples: int, sustain_level: float, release_samples: int,
-                           release_start_level: float) -> np.ndarray:
-        new_state = state
-        new_position = position
-        new_current_level = current_level
+    def _generate_curve(start: float, end: float, num_samples: int, curve: str) -> np.ndarray:
+        if curve == 'lin':
+            return np.linspace(start, end, num_samples)
+        elif curve == 'exp':
+            return np.geomspace(max(start, 1e-6), max(end, 1e-6), num_samples) - 1e-6
+        elif curve == 'log':
+            return np.logspace(np.log10(max(start, 1e-6)), np.log10(max(end, 1e-6)), num_samples) - 1e-6
+        else:
+            raise ValueError(f'Unsupported curve type: {curve}')
         
-        for i in range(num_samples):
-            if new_state == 'idle':
-                envelope[i] = 0.0
-                new_current_level = 0.0
-                if triggered:
-                    new_state = 'attack'
-                    new_position = 0
-            elif new_state == 'attack':
-                if new_position < attack_samples:
-                    new_current_level = new_position / attack_samples
-                    envelope[i] = new_current_level
-                    new_position += 1
-                else:
-                    new_state = 'decay'
-                    new_position = 0
-                    new_current_level = 1.0
-                    envelope[i] = new_current_level
-            elif new_state == 'decay':
-                if new_position < decay_samples:
-                    decay_factor = (1.0 - sustain_level)
-                    new_current_level = 1.0 - decay_factor * (new_position / decay_samples)
-                    envelope[i] = new_current_level
-                    new_position += 1
-                else:
-                    new_state = 'sustain'
-                    new_current_level = sustain_level
-                    envelope[i] = new_current_level
-            elif new_state == 'sustain':
-                new_current_level = sustain_level
-                envelope[i] = new_current_level
-                if not triggered:
-                    new_state = 'release'
-                    new_position = 0
-                    release_start_level = new_current_level
-            elif new_state == 'release':
-                if new_position < release_samples:
-                    new_current_level = release_start_level * (1.0 - (new_position / release_samples))
-                    envelope[i] = new_current_level
-                    new_position += 1
-                else:
-                    new_state = 'idle'
-                    new_current_level = 0.0
-                    envelope[i] = new_current_level
-            else:
-                envelope[i] = 0.0
-                new_current_level = 0.0
-                new_state = 'idle'
+    def generate(self, duration: float, trigger_on=True) -> np.ndarray:
+        num_samples = int(duration * self.sample_rate)
+        envelope = np.zeros(num_samples)
+        
+        if trigger_on:
+            if self.attack_samples > 0:
+                attack_signal = self._generate_curve(0, 1, self.attack_samples, self.curve)
+                envelope[:self.attack_samples] = attack_signal
                 
-        EnvelopeGenerator._new_state = new_state
-        EnvelopeGenerator._new_position = new_position
-        EnvelopeGenerator._new_current_level = new_current_level
+            if self.decay_samples > 0:
+                start = self.attack_samples
+                end = start + self.decay_samples
+                decay_signal = self._generate_curve(1, self.sustain_level, self.decay_samples, self.curve)
+                envelope[start : end] = decay_signal
+                
+            sustain_start = self.attack_samples + self.decay_samples
+            sustain_end = num_samples
+            envelope[sustain_start : sustain_end] = self.sustain_level
         
-        return envelope
-    
-    def generate(self, num_samples: int) -> np.ndarray:
-        envelope = np.zeros(num_samples, dtype=np.float32)
+        else:
+            if self.release_samples > 0:
+                release_signal = self._generate_curve(self.sustain_level, 0, self.release_samples, self.curve)
+                end = min(num_samples, self.release_samples)
+                envelope[: end] = release_signal
         
-        envelope = self._generate_envelope(
-            num_samples,
-            envelope,
-            self.state,
-            self.position,
-            self.current_level,
-            self.triggered,
-            self.attack_samples,
-            self.decay_samples,
-            self.sustain_level,
-            self.release_samples,
-            self.release_start_level
-        )
-        
-        self.state = self._new_state
-        self.position = self._new_position
-        self.current_level = self._new_current_level
-        
-        return envelope
-            
-        
-        
+        return envelope[:-1]
